@@ -1,7 +1,31 @@
 import maya.api.OpenMaya as om
 from . import rkattribute, rkdecorators
-reload(rkconnect)
+reload(rkattribute)
 reload(rkdecorators)
+
+def getMMatrix(mObj, attrStr):
+    """ util script to grab matrix from attribute
+
+        :param mObj: MObject with matrix attribute
+        :type mObj: MObject
+
+        :param attrStr: name of attribute
+        :param attrStr: str
+    """
+    mfnDn = om.MFnDependencyNode(mObj)
+    matrixattr =  mfnDn.attribute(attrStr)
+
+    matrixPlug = om.MPlug( mObj, matrixattr )
+    matrixPlug = matrixPlug.elementByLogicalIndex( 0 )
+    matrixMObj = matrixPlug.asMObject()
+
+    mfMatrixData = om.MFnMatrixData(matrixMObj)
+
+    print mfMatrixData.matrix()
+
+    return mfMatrixData.matrix()
+
+
 
 @rkdecorators.enable_om_undo
 def constraint(*args, **kwargs):
@@ -41,24 +65,50 @@ def constraint(*args, **kwargs):
     decomposeMat = dgMod.createNode("decomposeMatrix")
     dgMod.renameNode(decomposeMat, "_{0}_DMAT".format(name))
 
+    rkattribute.connect(invParMult, "matrixSum", decomposeMat, "inputMatrix", dgMod)
+
     # if we have multiple drivers, weight them
     if mSel.length() > 2:
         wtMat = dgMod.createNode("wtAddMatrix")
         dgMod.renameNode(wtMat, "_{0}_weightMatrix".format(name))
 
-    if mo:
-        mo_mobjs = []
-        for i in range(mSel.length()-1):
-            node_name = mSel.getDagPath(i).partialPathName().title()
+        if mo:
+            mo_mobjs = []
+            for i in range(mSel.length()-1):
+                node_name = mSel.getDagPath(i).partialPathName().title()
+                mm = dgMod.createNode("multMatrix")
+                dgMod.renameNode(mm, "_{0}{1}_MO".format(name, node_name))
+                mo_mobjs.append(mm)
+    else:
+        if mo:
+            MObjDriver = mSel.getDependNode(0)
+            MObjDriven = mSel.getDependNode(1)
+
+            node_name = mSel.getDagPath(0).partialPathName().title()
             mm = dgMod.createNode("multMatrix")
             dgMod.renameNode(mm, "_{0}{1}_MO".format(name, node_name))
-            mo_mobjs.append(mm)
 
-    # create connections
-    rkattribute.connect(invParMult, "matrixSum", decomposeMat, "inputMatrix", dgMod)
+            drivInvMat = getMMatrix(MObjDriver, "worldMatrix")
+            drivMat = getMMatrix(MObjDriver, "worldMatrix")
 
+            print mm.apiType()
+
+            
+
+            #print inPlug.name()
+
+            #print inPlug.isCompound
+
+            #rkattribute.set(inPlug, drivMat * drivInvMat)
+            #rkattribute.connect(MObjDriven, "worldMatrix", mm, "matrixIn[1]", dgMod)
 
     dgMod.doIt()
+
+    mmDn= om.MFnDependencyNode(mm)
+
+    inPlug = mmDn.findPlug("matrixIn", False)
+
+    print inPlug.name()
 
 
     return dgMod, om.MFnDependencyNode(decomposeMat).name()
