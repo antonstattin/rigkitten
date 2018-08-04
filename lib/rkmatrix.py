@@ -11,6 +11,8 @@ def getMMatrix(mObj, attrStr):
 
         :param attrStr: name of attribute
         :param attrStr: str
+
+        :return: MMatrix
     """
     mfnDn = om.MFnDependencyNode(mObj)
     matrixattr =  mfnDn.attribute(attrStr)
@@ -21,10 +23,7 @@ def getMMatrix(mObj, attrStr):
 
     mfMatrixData = om.MFnMatrixData(matrixMObj)
 
-    print mfMatrixData.matrix()
-
     return mfMatrixData.matrix()
-
 
 
 @rkdecorators.enable_om_undo
@@ -37,7 +36,7 @@ def constraint(*args, **kwargs):
         :Keyword Arguments:
             * name | n  - name of setup (str)
             * maintainOffset | mo  - if setup should maintain offset (bool)
-            * preventBenign | b  - prevent benign cycles, grab parent instead of
+            * preventBenignCycle | pbc  - prevent benign cycles, grab parent instead of
                                    using inverseParentMatrix from driven.
 
         :returns: a list of strings.
@@ -45,7 +44,7 @@ def constraint(*args, **kwargs):
                   if the constraint isn't weighted the function will return
                   the decompose matrix node and None.
     """
-    # checks
+
     if len(args)< 2: raise ValueError("Needs at least two transforms")
 
     # list nodes
@@ -55,60 +54,128 @@ def constraint(*args, **kwargs):
     # query kwargs
     name = kwargs.get("name", kwargs.get("n", "matrixConstraint"))
     mo = kwargs.get("maintainOffset", kwargs.get("mo", False))
-    pb = kwargs.get("preventBenign", kwargs.get("b", True))
+    pbc = kwargs.get("preventBenignCycle", kwargs.get("pbc", True))
 
     # create Matrix node(s)
     dgMod = om.MDGModifier()
+
     invParMult = dgMod.createNode("multMatrix")
     dgMod.renameNode(invParMult, "_{0}_InverseParent".format(name))
+
+    # use this if we are parented to world
+    noInverse = False
 
     decomposeMat = dgMod.createNode("decomposeMatrix")
     dgMod.renameNode(decomposeMat, "_{0}_DMAT".format(name))
 
-    rkattribute.connect(invParMult, "matrixSum", decomposeMat, "inputMatrix", dgMod)
+
+    # drivenObj
+    dnMobj = mSel.getDependNode(mSel.length()-1)
+
+    if pbc:
+        parentMObj = om.MFnDagNode(dnMobj).parent(0)
+        parent = om.MFnDependencyNode(parentMObj)
+
+        if parent.name() != "world":
+            dgMod.connect(rkattribute.getPlug(parentMObj, "worldInverseMatrix").elementByLogicalIndex(0),
+                          rkattribute.getPlug(invParMult, "matrixIn").elementByLogicalIndex(1))
+        else: noInverse=True
+
+    else:
+        dgMod.connect(rkattribute.getPlug(dnMobj, "parentInverseMatrix"),
+                      rkattribute.getPlug(invParMult, "matrixIn").elementByLogicalIndex(1))
+
+    if not noInverse:
+
+        dgMod.connect(rkattribute.getPlug(invParMult, "matrixSum"),
+                      rkattribute.getPlug(decomposeMat, "inputMatrix"))
+
+
+    if mo:
+        mo_mult_mobjs = []
+        for i in range(mSel.length()-1):
+            node_name = mSel.getDagPath(i).partialPathName().title()
+            mult = dgMod.createNode("multMatrix")
+            dgMod.renameNode(mult, "_{0}{1}_MO".format(name, node_name))
+
+            drMobj = mSel.getDependNode(i)
+
+            inA = rkattribute.getPlug(mult, "matrixIn").elementByLogicalIndex(0)
+            inB = rkattribute.getPlug(mult, "matrixIn").elementByLogicalIndex(1)
+            dWs = rkattribute.getPlug(drMobj, "worldMatrix").elementByLogicalIndex(0)
+
+            dMtx = getMMatrix(dnMobj, "worldMatrix")
+            dInvMtx = getMMatrix(drMobj, "worldInverseMatrix")
+
+            mtxPrdct = om.MFnMatrixData().create(dMtx * dInvMtx)
+            inA.setMObject(mtxPrdct)
+            dgMod.connect(dWs, inB)
+
+            mo_mult_mobjs.append(mult)
+
 
     # if we have multiple drivers, weight them
     if mSel.length() > 2:
         wtMat = dgMod.createNode("wtAddMatrix")
         dgMod.renameNode(wtMat, "_{0}_weightMatrix".format(name))
 
+        wt = 1.0/(mSel.length()-1)
+
         if mo:
-            mo_mobjs = []
+            for i, mult in enumerate(mo_mult_mobjs):
+                wtMatrixCmpnd = rkattribute.getPlug(wtMat, "wtMatrix").elementByLogicalIndex(i)
+                mtrxIn = wtMatrixCmpnd.child(0)
+                wtMatrixCmpnd.child(1).setFloat(wt)
+                dgMod.connect(rkattribute.getPlug(mult, "matrixSum"), mtrxIn)
+        else:
             for i in range(mSel.length()-1):
-                node_name = mSel.getDagPath(i).partialPathName().title()
-                mm = dgMod.createNode("multMatrix")
-                dgMod.renameNode(mm, "_{0}{1}_MO".format(name, node_name))
-                mo_mobjs.append(mm)
+                mobj = mSel.getDependNode(i)
+                wtMatrixCmpnd = rkattribute.getPlug(wtMat, "wtMatrix").elementByLogicalIndex(i)
+                mtrxIn = wtMatrixCmpnd.child(0)
+                wtMatrixCmpnd.child(1).setFloat(wt)
+
+                dgMod.connect(rkattribute.getPlug(mobj, "worldMatrix").elementByLogicalIndex(0), mtrxIn)
+
+
+        if noInverse:
+            dgMod.connect(rkattribute.getPlug(wtMat, "matrixSum"),
+                          rkattribute.getPlug(decomposeMat, "inputMatrix"))
+        else:
+            dgMod.connect(rkattribute.getPlug(wtMat, "matrixSum"),
+                      rkattribute.getPlug(invParMult, "matrixIn").elementByLogicalIndex(0))
+
     else:
-        if mo:
-            MObjDriver = mSel.getDependNode(0)
-            MObjDriven = mSel.getDependNode(1)
+        if noInverse:
+            if mo:
+                drvNode = mo_mult_mobjs[0]
+                dgMod.connect(rkattribute.getPlug(drvNode, "matrixSum"),
+                              rkattribute.getPlug(decomposeMat, "inputMatrix"))
+            else:
+                dgMod.connect(rkattribute.getPlug(mSel.getDependNode(0),
+                              "worldMatrix").elementByLogicalIndex(0),
+                              rkattribute.getPlug(decomposeMat, "inputMatrix"))
+        else:
+            if mo:
+                drvNode = mo_mult_mobjs[0]
+                dgMod.connect(rkattribute.getPlug(drvNode, "matrixSum"),
+                             rkattribute.getPlug(invParMult, "matrixIn").elementByLogicalIndex(0))
+            else:
+                dgMod.connect(rkattribute.getPlug(mSel.getDependNode(0),
+                              "worldMatrix").elementByLogicalIndex(0),
+                              rkattribute.getPlug(invParMult, "matrixIn").elementByLogicalIndex(0))
 
-            node_name = mSel.getDagPath(0).partialPathName().title()
-            mm = dgMod.createNode("multMatrix")
-            dgMod.renameNode(mm, "_{0}{1}_MO".format(name, node_name))
+    dgMod.connect(rkattribute.getPlug(decomposeMat, "outputRotate"),
+                  rkattribute.getPlug(dnMobj, "rotate"))
 
-            drivInvMat = getMMatrix(MObjDriver, "worldMatrix")
-            drivMat = getMMatrix(MObjDriver, "worldMatrix")
-
-            print mm.apiType()
-
-            
-
-            #print inPlug.name()
-
-            #print inPlug.isCompound
-
-            #rkattribute.set(inPlug, drivMat * drivInvMat)
-            #rkattribute.connect(MObjDriven, "worldMatrix", mm, "matrixIn[1]", dgMod)
+    dgMod.connect(rkattribute.getPlug(decomposeMat, "outputTranslate"),
+                  rkattribute.getPlug(dnMobj, "translate"))
 
     dgMod.doIt()
 
-    mmDn= om.MFnDependencyNode(mm)
+    if noInverse:
+        dgMod.deleteNode(invParMult)
 
-    inPlug = mmDn.findPlug("matrixIn", False)
-
-    print inPlug.name()
-
-
-    return dgMod, om.MFnDependencyNode(decomposeMat).name()
+    # return weightMatrix node if we created one..
+    if mSel.length() > 2:
+        return dgMod, om.MFnDependencyNode(decomposeMat).name(), om.MFnDependencyNode(wtMat).name()
+    else: return dgMod, om.MFnDependencyNode(decomposeMat).name()
