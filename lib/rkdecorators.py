@@ -13,7 +13,7 @@ def enable_om_undo(fnc):
 
         ret = fnc(*args, **kwargs)
 
-        if len(ret) > 1:
+        if isinstance(ret, tuple):
             mod = ret[0]
             ret = [x for x in ret[1:]]
         else:
