@@ -234,13 +234,6 @@ def aimConstraint(driver, driven, **kwargs):
                       rkattribute.getPlug(upVecMtxMult, "matrixIn").elementByLogicalIndex(1))
 
 
-    """
-    import sys
-
-    sys.path.append("D:/project/cathulu_project/")
-
-    import rigkitten
-    """
 
     dgMod.doIt()
 
