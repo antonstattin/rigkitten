@@ -158,6 +158,7 @@ def aimConstraint(driver, driven, **kwargs):
     name = kwargs.get("name", kwargs.get("n", "matrixConstraint"))
     mo = kwargs.get("maintainOffset", kwargs.get("mo", False))
     aimVector = kwargs.get("aimVector", kwargs.get("aim", "x"))
+    upObj = kwargs.get("upObject", kwargs.get("up", None))
     pbc = kwargs.get("preventBenignCycle", kwargs.get("pbc", True))
 
 
@@ -184,7 +185,6 @@ def aimConstraint(driver, driven, **kwargs):
     rkattribute.getPlug(getAimVecPMA, "operation").setInt(2)
 
     # connect pointMatrixMult
-
     dgMod.connect(rkattribute.getPlug(driver, "worldMatrix").elementByLogicalIndex(0),
                   rkattribute.getPlug(toPoint, "inMatrix"))
 
@@ -210,7 +210,37 @@ def aimConstraint(driver, driven, **kwargs):
         dgMod.connect(rkattribute.getPlug(toPoint, "output"),
                       rkattribute.getPlug(getAimVecPMA, "input3D").elementByLogicalIndex(1))
 
+    if upObj:
 
+        # Create a normalized vector
+        mSel.add(upObj)
+        upObj = mSel.getDependNode(2)
+        upObjMfnT = om.MFnTransform(upObj)
+
+        vec = upObjMfnT.translation(om.MSpace.kObject)
+        offsetMtx = om.MMatrix((1,0,0,0, 0,1,0,0, 0,0,1,0, vec.x,vec.y+1,vec.z, 0))
+
+        upVecMtxMult = dgMod.createNode("multMatrix")
+        dgMod.renameNode(upVecMtxMult, "_{0}_UpMtxMult".format(name))
+
+
+        upVecMtxDcmp = dgMod.createNode("decomposeMatrix")
+        dgMod.renameNode(upVecMtxDcmp, "_{0}UpVector_DMtx".format(name))
+
+        mtxPrdct = om.MFnMatrixData().create(offsetMtx)
+
+        rkattribute.getPlug(upVecMtxMult, "matrixIn").elementByLogicalIndex(0).setMObject(mtxPrdct)
+        dgMod.connect(rkattribute.getPlug(upObj, "worldMatrix").elementByLogicalIndex(0),
+                      rkattribute.getPlug(upVecMtxMult, "matrixIn").elementByLogicalIndex(1))
+
+
+    """
+    import sys
+
+    sys.path.append("D:/project/cathulu_project/")
+
+    import rigkitten
+    """
 
     dgMod.doIt()
 
