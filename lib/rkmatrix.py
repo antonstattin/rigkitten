@@ -154,6 +154,51 @@ def spaceSwitch(*args, **kwargs):
     return dgMod
 
 @rkdecorators.enable_om_undo
+def curveConstraint(driven, curve, **kwargs):
+    """
+        Attach driven to curve
+    """
+
+    mSel = om.MSelectionList()
+    mSel.add(driven)
+    mSel.add(curve)
+
+    driven_mobj = mSel.getDependNode(0)
+    curve_mobj = mSel.getDependNode(1)
+
+    # query kwargs
+    name = kwargs.get("name", kwargs.get("n", "matrixConstraint"))
+    mo = kwargs.get("maintainOffset", kwargs.get("mo", False))
+    aimVector = kwargs.get("aimVector", kwargs.get("aim", "x"))
+    upObj = kwargs.get("upObject", kwargs.get("upobj", None))
+    pbc = kwargs.get("preventBenignCycle", kwargs.get("pbc", True))
+    aimObj = kwargs.get("aimObject", kwargs.get("aobj", None))
+
+    # create modifier
+    dgMod = om.MDGModifier()
+
+    poci = dgMod.createNode("pointOnCurveInfo")
+    dgMod.renameNode(poci, "_{0}_POCI".format(name))
+
+    fbfm = dgMod.createNode("fourByFourMatrix")
+    dgMod.renameNode(fbfm, "_{0}_FbFMtx".format(name))
+
+    vp = dgMod.createNode("vectorProduct")
+    dgMod.renameNode(vp, "_{0}_VecPrdct".format(name))
+
+    fromPoint = dgMod.createNode("pointMatrixMult")
+    dgMod.renameNode(fromPoint, "_{0}_fromPnt".format(name))
+
+    toPoint = dgMod.createNode("pointMatrixMult")
+    dgMod.renameNode(toPoint, "_{0}_toPnt".format(name))
+
+    decomp = dgMod.createNode("decomposeMatrix")
+    dgMod.renameNode(decomp, "_{0}_DecmpMtx".format(name))
+
+    getVector = dgMod.createNode("plusMinusAverage")
+    dgMod.renameNode(getVector, "_{0}_getVec".format(name))
+
+@rkdecorators.enable_om_undo
 def aimConstraint(driver, driven, **kwargs):
     """
         Creates a matrix aim constraint between two objects.
@@ -336,12 +381,7 @@ def aimConstraint(driver, driven, **kwargs):
         dgMod.connect(fbfout, inB)
 
         outPlug = rkattribute.getPlug(mult, "matrixSum")
-        #dgMod.connect(rkattribute.getPlug(mult, "matrixSum"),
-                      #rkattribute.getPlug(aimMtxDcmp, "inputMatrix"))
-    else:
-        outPlug = rkattribute.getPlug(fbfm, "output")
-        #dgMod.connect(rkattribute.getPlug(fbfm, "output"),
-                      #rkattribute.getPlug(aimMtxDcmp, "inputMatrix"))
+    else: outPlug = rkattribute.getPlug(fbfm, "output")
 
 
     if pbc:
@@ -380,7 +420,7 @@ def aimConstraint(driver, driven, **kwargs):
 
     dgMod.doIt()
 
-    return dgMod
+    return dgMod, aimMtxDcmp
 
 @rkdecorators.enable_om_undo
 def constraint(*args, **kwargs):
