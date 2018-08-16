@@ -2,8 +2,8 @@ import json
 import os
 import sys
 
-import rigkitten.rig.component.anim as anim
-reload(anim)
+import rigkitten.rig.component.util as util
+reload(util)
 
 import build, guide
 reload(build)
@@ -12,7 +12,7 @@ reload(guide)
 PARAMFILE = "parms.json"
 _DEFAULT_PARMS_ = {"name":{"value":__name__.rpartition(".")[2]},
                    "side":{"value":anim.kSideSuffix.CENTER},
-                   "module":{"value":__name__}}
+                   "module":{"value":Rig.__module__}}
 
 def new():
     if sys.platform == 'win32':
@@ -27,7 +27,7 @@ def new():
     return Rig(**param_data)
 
 
-class Rig(anim.AnimComponent):
+class Rig(util.UtilComponent):
 
     _MODNAME = __name__
 
@@ -35,5 +35,5 @@ class Rig(anim.AnimComponent):
         super(Rig, self).__init__(*arg, **kwargs)
 
         # SET MAIN FUNCTIONS
-        self._GUIDE_MOD = guide
-        self._BUILD_MOD = build
+        self._GUIDE_FNC = None
+        self._RIG_FNC = None

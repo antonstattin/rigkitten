@@ -1,6 +1,6 @@
 
 import rigkitten.rig.component as cmpt
-
+reload(cmpt)
 class kSideSuffix(object):
     CENTER = 0
     LEFT = 1
