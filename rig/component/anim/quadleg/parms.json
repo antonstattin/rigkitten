@@ -1,0 +1,12 @@
+{
+  "skeleton":{ "value":{"upperLeg":null,
+                        "knee":null,
+                        "ankle":null,
+                        "metaTarsal":null,
+                        "tarsal":null}
+  },
+    "AutoTarsalAlignment":{
+        "comment": "creates a setup with auto tarsal alignment",
+        "value":true
+    }
+}

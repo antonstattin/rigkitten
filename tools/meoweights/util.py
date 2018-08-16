@@ -51,6 +51,18 @@ def gatherCordinates(dagpath, uvset='rigset'):
 
     return wsPositions, uvPositions
 
+def getDagPath(node):
+    mSel = om.MSelectionList()
+    mSel.add(node)
+    return mSel.getDagPath(0)
+
+def getMObj(node):
+
+    mSel = om.MSelectionList()
+    mSel.add(node)
+    return mSel.getDependNode(0)
+
+
 def getShape(node, intermediate=False):
     """ Returns the shape of given object or intermediate object
 
@@ -65,9 +77,7 @@ def getShape(node, intermediate=False):
     if isinstance(node, om.MObject):
         nodeDgPath = om.MDagPath().getAPathTo(node)
     else:
-        mSel = om.MSelectionList()
-        mSel.add(node)
-        nodeDgPath = mSel.getDagPath(0)
+        nodeDgPath = getDagPath(node)
 
     if nodeDgPath.apiType() == om.MFn.kTransform:
 

@@ -6,6 +6,9 @@ logger = logging.getLogger(__name__)
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaAnim as oam
 
+# creating the skc + bindpose + deformer set is to messy..
+import maya.cmds as cmds
+
 from rigkitten import rkattribute as rkattr
 from . import util, io
 
@@ -34,8 +37,35 @@ class SkinCluster(object):
         except:
             raise RuntimeError("No skincluster on '{}'".format(om.MFnDependencyNode(oShape).name()))
 
-    def __init__(self, shape=None, uvset="rigset"):
+    def importWeights(data, type="topology", **kwarg):
 
+        self.data = data
+        if type == "topology":
+            self._importWeightTopo(**kwarg)
+        elif type == "worldspace":
+            self._importWeightWS(**kwarg)
+        elif type == "uv":
+            self._importWeightUV(**kwarg)
+
+    def _importWeightWS(self, **kwarg): return
+    def _importWeightUV(self, **kwarg): return
+
+    def _importWeightTopo(self, **kwarg):
+
+        shape = kwarg.get("shape", "none")
+
+        key = self.data.keys()[0]
+        if not shape: shape = key
+
+        influences = self.data[key]["weights"].keys()
+        nw = self.data[key]["normalizeWeights"].keys()
+        sm = self.data[key]["skinningMethod"].keys()
+        skc = cmds.skinCluster(influences, shape, nw=nw)
+
+        skcMObj = util.getMObj(skc)
+        fnSkin = oam.MFnSkinCluster(skcMObj)
+
+    def __init__(self, shape=None, uvset="rigset"):
 
         if not shape:
             selection = om.MGlobal.getActiveSelectionList()
@@ -53,18 +83,18 @@ class SkinCluster(object):
         self.skcNode = SkinCluster.getSkinCluster(self.shape)
         self.skcName = om.MFnDependencyNode(self.skcNode.object()).name()
 
-        self.data = {
-                    'weights':{},
-                    'blendWeights':[],
-                    'wsPos':[],
-                    'uv':[],
-                    'name':self.skcName
-                    }
+        self.shapeName = om.MFnDependencyNode(self.shape).name()
+
+        self.data = {self.shapeName:{
+                                    'weights':{},
+                                    'blendWeights':[],
+                                    'wsPos':[],
+                                    'uv':[],
+                                    'name':self.skcName
+                                    }}
 
     def gatherData(self):
         """ gathers all the skincluster-data """
-        # start timer
-        start = time.clock()
 
         dagpath, cmpnts = self._getComponents()
         self.gatherInfWeights(dagpath, cmpnts)
@@ -72,37 +102,30 @@ class SkinCluster(object):
 
         # gather worldPosition and UVs (if rigset exists)
         wsPositions, uvPositions = util.gatherCordinates(dagpath, uvset=self.uvset)
-        self.data["wsPos"] = wsPositions
-        self.data["uv"] = uvPositions
+        self.data[self.shapeName]["wsPos"] = wsPositions
+        self.data[self.shapeName]["uv"] = uvPositions
 
         for attr in ['skinningMethod', 'normalizeWeights']:
-            self.data[attr] = rkattr.getPlug(self.skcNode.object(), attr).asInt()
-
-        # end timer
-        elapsed = time.clock()
-        elapsed = elapsed - start
-
-        logger.info("Exported Data in {}s".format(elapsed))
-
+            self.data[self.shapeName][attr] = rkattr.getPlug(self.skcNode.object(), attr).asInt()
 
     def gatherBlendWeights(self, dagpath, cmpnts):
         """ gathers the blend weights"""
 
         weights = self.skcNode.getBlendWeights(dagpath, cmpnts)
-        self.data['blendWeights'] = [weight for weight in weights]
+        self.data[self.shapeName]['blendWeights'] = [weight for weight in weights]
 
     def gatherInfWeights(self, dagpath, cmpnts):
         """gathers the influence weights"""
         weights = self._getCurrentWeights(dagpath, cmpnts)
 
         infPaths = self.skcNode.influenceObjects()
-        numInfpercomp = len(weights)/(len(infPaths))
+        numInfpercomp = len(weights)/len(infPaths)
 
         for i, infPath in enumerate(infPaths):
             influenceName = infPath.partialPathName()
             infCleanName = util.removeNamespaceFromString(influenceName)
 
-            self.data['weights'][infCleanName] = \
+            self.data[self.shapeName]['weights'][infCleanName] = \
                 [weights[jj*(len(infPaths)-1)*i] for jj in range(numInfpercomp)]
 
     def _getCurrentWeights(self, dagpath, cmpnts):

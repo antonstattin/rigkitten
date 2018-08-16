@@ -1,0 +1,3 @@
+
+
+def rigIt(task): return
