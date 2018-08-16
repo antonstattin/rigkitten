@@ -4,16 +4,12 @@ import uuid
 import sys
 
 import maya.cmds as cmds
+import rigkitten.rig.cio as cio
 
 class kBuildType(object):
     PRE = "pre"
     RUN = "run"
     POST = "post"
-
-class kStoreTypes(object):
-
-    TRANSFROM = "transform"
-    HIERARCHY = "hierarchy"
 
 class BaseComponent(object):
 
@@ -35,7 +31,7 @@ class BaseComponent(object):
         self._BUILD_MOD = None
         self._GUIDE_MOD = None
 
-        self.kStoreTypes = kStoreTypes
+        self.kStoreTypes = cio.kStoreTypes
 
     def log(self, msg):
         self._logger.info(msg)

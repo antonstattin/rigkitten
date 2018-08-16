@@ -1,13 +1,15 @@
 
+import os
 import json
 import rigkitten.rig.component as cmpnt
 
 class Rig(object):
 
-    def __init__(self, name="Munchkin"):
+    def __init__(self, name="Munchkin", path=None):
 
         self._tasks = []
         self._name = name
+        self._path = None
 
     def addComponent(self, cmpt, index=0):
         if cmpt in self._tasks:
@@ -17,12 +19,23 @@ class Rig(object):
     def _serializeTasks(self):
         return [task.serialize() for task in self._tasks]
 
-    def save(self, path):
+    def save(self):
         """ save rig to json """
+        if not os.path.isdir(self._path): return
 
         dTasks = self._serializeTasks()
-        with open(path, 'w') as outfile: json.dump(dTasks, outfile, indent=4)
+        with open("{}/{}.json".format(self._path, self._name), 'w') as outfile:
+            json.dump(dTasks, outfile, indent=4)
 
+    def load(self): return
+
+    def importComponentData(self, task, stage):
+        cPath = "{}/components/{}/{}".format(self.path, task.id, stage)
+        if not os.path.isdir(cPath): return
+
+    def _importAllComponentData(self, stage):
+        for task in self._tasks:
+            self.importComponentData(task, stage)
 
     def guide(self):
 
@@ -31,21 +44,22 @@ class Rig(object):
             if task.stage == "init":
                 task.guide(bType=cmpnt.kBuildType.PRE)
 
-        # import data
+        self._importAllComponentData(".".join(["guide",cmpnt.kBuildType.PRE]))
 
         # run build
         for task in self._tasks:
             if task.stage == ".".join(["guide",cmpnt.kBuildType.PRE]):
                 task.guide(bType=cmpnt.kBuildType.RUN)
 
-        # import data
+        self._importAllComponentData(".".join(["guide",cmpnt.kBuildType.RUN]))
 
         # run post
         for task in self._tasks:
             if task.stage == ".".join(["guide",cmpnt.kBuildType.RUN]):
                 task.guide(bType=cmpnt.kBuildType.POST)
 
-        # import data
+        self._importAllComponentData(".".join(["guide",cmpnt.kBuildType.POST]))
+
 
     def build(self):
 
@@ -54,24 +68,21 @@ class Rig(object):
             if task.stage == ".".join(["guide",cmpnt.kBuildType.POST]):
                 task.build(bType=cmpnt.kBuildType.PRE)
 
-        # import data
+        self._importAllComponentData(".".join(["build",cmpnt.kBuildType.PRE]))
 
         # run build
         for task in self._tasks:
             if task.stage == ".".join(["build",cmpnt.kBuildType.PRE]):
                 task.build(bType=cmpnt.kBuildType.RUN)
 
-        # import data
+        self._importAllComponentData(".".join(["build",cmpnt.kBuildType.RUN]))
 
         # run post
         for task in self._tasks:
             if task.stage == ".".join(["build",cmpnt.kBuildType.RUN]):
                 task.build(bType=cmpnt.kBuildType.POST)
 
-        # import data
-
-
-
+        self._importAllComponentData(".".join(["build",cmpnt.kBuildType.POST]))
 
     def __len__(self): return len(self._tasks)
 
