@@ -10,7 +10,7 @@ class TransformIO(object):
     @classmethod
     def importData(): return
 
-    @classmethod:
+    @classmethod
     def exportData(): return
 
 class HierarchyIO(object):
@@ -18,5 +18,5 @@ class HierarchyIO(object):
     @classmethod
     def importData(): return
 
-    @classmethod:
+    @classmethod
     def exportData(): return

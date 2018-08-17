@@ -4,12 +4,22 @@ import uuid
 import sys
 
 import maya.cmds as cmds
-import rigkitten.rig.cio as cio
+
+from .. import cio
+reload(cio)
+
+class kBuildNS(object):
+    GUIDE = "Guide"
+    BUILD = "Rig"
 
 class kBuildType(object):
     PRE = "pre"
     RUN = "run"
     POST = "post"
+
+class kStage(object):
+    GUIDE = "guide"
+    BUILD = "build"
 
 class BaseComponent(object):
 
@@ -42,7 +52,13 @@ class BaseComponent(object):
             :param bType: type of build
             :type bType: kBuildType
         """
+
+        if not cmds.namespace(exists=kBuildNS.BUILD):
+            cmds.namespace(add=kBuildNS.BUILD)
+
+        cmds.namespace(set=kBuildNS.BUILD)
         self._run(self._BUILD_MOD, bType)
+        cmds.namespace(set=":")
 
     def guide(self, bType=kBuildType.RUN):
         """ Run guide methods
@@ -50,7 +66,13 @@ class BaseComponent(object):
             :param bType: type of build
             :type bType: kBuildType
         """
+
+        if not cmds.namespace(exists=kBuildNS.GUIDE):
+            cmds.namespace(add=kBuildNS.GUIDE)
+
+        cmds.namespace(set=kBuildNS.GUIDE)
         self._run(self._GUIDE_MOD, bType)
+        cmds.namespace(set=":")
 
     def _run(self, mod, bType=kBuildType.RUN):
         """ runs the build methods """
@@ -79,22 +101,28 @@ class BaseComponent(object):
             cmds.undoInfo(cck=True)
             cmds.undo()
 
+            # NOTE mght have to deal with stored data too
+
             self.stage = currentStage
             raise
 
-
-
     def store(self, dtype, objects, **kwargs):
         kwargs.update({"objects":objects})
-        if dtype not in self.stored.keys(): self.stored.update({dtype:[]})
-        self.stored[dtype].append(kwargs)
+
+        if self.stage not in self.stored:
+            self.stored.update({self.stage:{}})
+
+        if dtype not in self.stored[self.stage].keys():
+            self.stored[self.stage].update({dtype:[]})
+
+        self.stored[self.stage][dtype].append(kwargs)
 
 
     def serialize(self):
         """ serialize component so we can store it """
 
         #NOTE might have an issue if we have invalid objects inside list/dict..
-        validTypes = [int, str, dict, list, float]
+        validTypes = [int, str, dict, list, float, unicode]
 
         data = {}
         for key, value in self.__dict__.items():
