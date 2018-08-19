@@ -82,8 +82,6 @@ class BaseComponent(object):
             self.stage = currentStage
             raise
 
-
-
     def store(self, dtype, objects, **kwargs):
         kwargs.update({"objects":objects})
         if dtype not in self.stored.keys(): self.stored.update({dtype:[]})
