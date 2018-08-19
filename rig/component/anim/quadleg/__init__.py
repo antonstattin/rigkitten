@@ -2,7 +2,7 @@ import json
 import os
 import sys
 
-import rigkitten.rig.component.anim as anim
+from ... import anim
 reload(anim)
 
 import build, guide
@@ -24,15 +24,15 @@ def new():
     param_data = _DEFAULT_PARMS_
     with open(paramjson) as ofile: param_data.update(json.load(ofile))
 
-    return Rig(**param_data)
+    return Task(**param_data)
 
 
-class Rig(anim.AnimComponent):
+class Task(anim.AnimComponent):
 
     _MODNAME = __name__
 
     def __init__(self, *arg, **kwargs):
-        super(Rig, self).__init__(*arg, **kwargs)
+        super(Task, self).__init__(*arg, **kwargs)
 
         # SET MAIN FUNCTIONS
         self._GUIDE_MOD = guide
