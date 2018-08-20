@@ -91,8 +91,6 @@ class BaseComponent(object):
 
         fnc = getattr(mod, bType)
         try:
-            # turn on undo
-            cmds.undoInfo(ock=True)
             self.stage =  "{}.{}".format(modname, bType)
             fnc(self)
         except Exception:
@@ -105,6 +103,7 @@ class BaseComponent(object):
 
             self.stage = currentStage
             raise
+        
 
     def store(self, dtype, objects, **kwargs):
         kwargs.update({"objects":objects})
