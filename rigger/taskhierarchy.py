@@ -16,7 +16,9 @@ class TaskLayer(TaskObj):
 class Task(TaskObj):
 
     def __init__(self):
+
         self._params = []
+
 
 class Param(TaskObj):
     def __init__(self):
@@ -70,6 +72,7 @@ class Param(TaskObj):
 
 class ParamGroup(TaskObj):
     def __init__(self):
+
         self._params = []
 
 class TaskHierarchy(object):
