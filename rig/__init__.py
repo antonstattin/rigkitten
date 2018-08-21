@@ -1,5 +1,6 @@
 
 import os
+import re
 import json
 import importlib
 from . import cio
@@ -125,7 +126,7 @@ class Rig(object):
 
         self._loadTasksFromDict(dTasks["rig"])
 
-    def importComponentData(self, id, stage, dtype):
+    def importComponentData(self, taskId, stage, dtype):
         """ import component data like transform or deformer weights
 
             :param id: id of component
@@ -137,11 +138,19 @@ class Rig(object):
             :param dtype: type of data
             :type stage: str
         """
-        cPath = "{}/.taskdata/{}/{}".format(self._path, id, stage)
+        cPath = "{}/.taskdata/{}/{}/{}".format(self._path, taskId, stage, dtype)
         if not os.path.isdir(cPath): return
 
-        for folder in os.path.listdir(cPath):
-            print folder
+        highestVersion = 0
+        latestDFile = None
+        for dFile in os.listdir(cPath):
+            version = int(re.search('\d\d\d', dFile).group(0))
+            if version > highestVersion:
+                highestVersion = version
+                latestDFile = "{}/{}".format(cPath, dFile)
+
+        iocls = getattr(cio, dtype)
+        iocls.importData(latestDFile)
 
     def exportComponentData(self, task, stage, dtype="all"):
         """ export component data
@@ -190,7 +199,32 @@ class Rig(object):
         for task in self._tasks: self.resetComponent(task)
 
     def _importAllComponentData(self, stage):
-        for task in self._tasks: self.importComponentData(task, stage)
+
+        # deal with order of data import
+        transformIOList = []
+        hierarchyIOList = []
+        allIOList = []
+
+        for task in self._tasks:
+            if not stage in task.stored.keys(): continue
+
+            for key in task.stored[stage].keys():
+                if key == "TransformIO": transformIOList.append(task)
+                elif key == "HierarchyIO": hierarchyIOList.append(task)
+                else: allIOList.append(task)
+
+        # import in order
+        for task in transformIOList:
+            self.importComponentData(task.id, stage, "TransformIO")
+
+        for task in hierarchyIOList:
+            self.importComponentData(task.id, stage, "HierarchyIO")
+
+        for task in allIOList:
+            for key in task.stored[stage].keys():
+                if key == "TransformIO" or key == "HierarchyIO": continue
+
+                self.importComponentData(task.id, stage, key)
 
 
     def guide(self):
